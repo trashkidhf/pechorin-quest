@@ -79,6 +79,29 @@ const firebaseConfig = {
       { id: 3, title: 'Флекс в Махачкале', location: 'Шумная улица города', bgClass: 'city-bg', icon: '🌆', originalText: 'Эти люди — полный флекс, живут как хайповые тиктокеры!', correctText: 'Эти люди — полное веселье, живут как модники!', words: [{ slang: 'флекс', correct: 'веселье', options: ['веселье', 'гибкость', 'флаг'] }, { slang: 'хайповые', correct: 'модные', options: ['модные', 'высокие', 'хитрые'] }, { slang: 'тиктокеры', correct: 'модники', options: ['модники', 'танцоры', 'блогеры'] }], proverb: { full: 'Слово не воробей — вылетит, не поймаешь', words: ['Слово', 'не', 'воробей', '—', 'вылетит,', 'не', 'поймаешь'], distractors: ['флекс', 'хайп', 'кринж', 'рофл'] } }
     ];
 
+    auth.getRedirectResult().then((result) => {
+  if (result.user) {
+    console.log('Успешный вход через redirect');
+  }
+}).catch((error) => {
+  console.error('Ошибка redirect:', error);
+  alert('Ошибка входа: ' + error.message);
+});
+
+function login() {
+  console.log('Начинаем вход через Google...');
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  });
+  
+  auth.signInWithRedirect(provider)
+    .catch((error) => {
+      console.error('Ошибка при запуске redirect:', error);
+      alert('Не удалось начать вход: ' + error.message);
+    });
+}
+    
     // --- ЛОГИКА FIREBASE ---
     auth.onAuthStateChanged(user => {
       currentUser = user;
@@ -453,4 +476,5 @@ const firebaseConfig = {
   </script>
 </body>
 </html>
+
 
