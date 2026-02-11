@@ -41,24 +41,23 @@
   <div id="app" class="h-full w-full overflow-auto"></div>
 
   <script>
-    // --- ТВОИ НАСТРОЙКИ FIREBASE ---
-    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAG5DU2VJR_8FjBUs6ZkHJ90FGmB05RP_Q",
-  authDomain: "pechorin-quest.firebaseapp.com",
-  databaseURL: "https://pechorin-quest-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "pechorin-quest",
-  storageBucket: "pechorin-quest.firebasestorage.app",
-  messagingSenderId: "234397373581",
-  appId: "1:234397373581:web:f1b9b72f55939ad85d7ec4",
-  measurementId: "G-TR56QES3EP"
-};
+    // --- FIREBASE CONFIG ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAG5DU2VJR_8FjBUs6ZkHJ90FGmB05RP_Q",
+      authDomain: "pechorin-quest.firebaseapp.com",
+      databaseURL: "https://pechorin-quest-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "pechorin-quest",
+      storageBucket: "pechorin-quest.firebasestorage.app",
+      messagingSenderId: "234397373581",
+      appId: "1:234397373581:web:f1b9b72f55939ad85d7ec4",
+      measurementId: "G-TR56QES3EP"
+    };
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
 
-    // --- ПЕРЕМЕННЫЕ ИГРЫ ---
+    // --- GAME VARIABLES ---
     let currentUser = null;
     let completedEpisodes = [];
     let leaderBoardData = [];
@@ -79,48 +78,63 @@ const firebaseConfig = {
       { id: 3, title: 'Флекс в Махачкале', location: 'Шумная улица города', bgClass: 'city-bg', icon: '🌆', originalText: 'Эти люди — полный флекс, живут как хайповые тиктокеры!', correctText: 'Эти люди — полное веселье, живут как модники!', words: [{ slang: 'флекс', correct: 'веселье', options: ['веселье', 'гибкость', 'флаг'] }, { slang: 'хайповые', correct: 'модные', options: ['модные', 'высокие', 'хитрые'] }, { slang: 'тиктокеры', correct: 'модники', options: ['модники', 'танцоры', 'блогеры'] }], proverb: { full: 'Слово не воробей — вылетит, не поймаешь', words: ['Слово', 'не', 'воробей', '—', 'вылетит,', 'не', 'поймаешь'], distractors: ['флекс', 'хайп', 'кринж', 'рофл'] } }
     ];
 
-    auth.getRedirectResult().then((result) => {
-  if (result.user) {
-    console.log('Успешный вход через redirect');
-  }
-}).catch((error) => {
-  console.error('Ошибка redirect:', error);
-  alert('Ошибка входа: ' + error.message);
-});
-
-function login() {
-  console.log('Начинаем вход через Google...');
-  const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({
-    prompt: 'select_account'
-  });
-  
-  auth.signInWithRedirect(provider)
-    .catch((error) => {
-      console.error('Ошибка при запуске redirect:', error);
-      alert('Не удалось начать вход: ' + error.message);
-    });
-}
+    // --- FIREBASE AUTH LOGIC ---
     
-    // --- ЛОГИКА FIREBASE ---
+    // Обработка результата redirect (если был)
+    auth.getRedirectResult().then((result) => {
+      if (result.user) {
+        console.log('✅ Успешный вход через redirect:', result.user.displayName);
+      }
+    }).catch((error) => {
+      console.error('❌ Ошибка redirect:', error.code, error.message);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        alert('Ошибка входа: ' + error.message);
+      }
+    });
+
+    // Отслеживание состояния авторизации
     auth.onAuthStateChanged(user => {
       currentUser = user;
       if (user) {
+        console.log('👤 Пользователь вошёл:', user.displayName);
         loadUserProgress(user.uid);
       } else {
-        renderMenu(); // Рендерим меню, даже если не вошли
+        console.log('👤 Пользователь не авторизован');
+        renderMenu();
       }
     });
 
     function login() {
+      console.log('🔐 Запуск авторизации Google...');
       const provider = new firebase.auth.GoogleAuthProvider();
-      // Используем Redirect, чтобы окно не блокировалось
-      auth.signInWithRedirect(provider);
+      provider.addScope('profile');
+      provider.addScope('email');
+      
+      // Сначала пробуем popup (быстрее и удобнее)
+      auth.signInWithPopup(provider)
+        .then((result) => {
+          console.log('✅ Успешный вход через popup:', result.user.displayName);
+        })
+        .catch((error) => {
+          console.warn('⚠️ Popup не сработал:', error.code);
+          
+          // Если popup заблокирован, используем redirect
+          if (error.code === 'auth/popup-blocked' || 
+              error.code === 'auth/cancelled-popup-request' ||
+              error.code === 'auth/popup-closed-by-user') {
+            console.log('🔄 Переключаемся на redirect...');
+            auth.signInWithRedirect(provider);
+          } else {
+            console.error('❌ Ошибка авторизации:', error.message);
+            alert('Ошибка входа: ' + error.message);
+          }
+        });
     }
 
     function logout() {
       auth.signOut().then(() => { 
         completedEpisodes = []; 
+        console.log('👋 Выход выполнен');
         location.reload(); 
       });
     }
@@ -137,6 +151,7 @@ function login() {
           score: completedEpisodes.length,
           photo: currentUser.photoURL
         });
+        console.log('💾 Прогресс сохранён:', completedEpisodes.length, 'эпизодов');
       }
     }
 
@@ -145,6 +160,7 @@ function login() {
         const data = snapshot.val();
         if (data && data.completed) {
           completedEpisodes = data.completed;
+          console.log('📂 Загружен прогресс:', completedEpisodes);
         }
         renderMenu();
       });
@@ -154,13 +170,14 @@ function login() {
       db.ref('leaderboard').orderByChild('score').limitToLast(10).once('value').then(snapshot => {
         leaderBoardData = [];
         snapshot.forEach(child => {
-          leaderBoardData.unshift(child.val()); // Добавляем в начало, чтобы топ был сверху
+          leaderBoardData.unshift(child.val());
         });
+        console.log('🏆 Загружена таблица лидеров:', leaderBoardData.length, 'игроков');
         renderLeaderboard();
       });
     }
 
-    // --- ФУНКЦИИ ИНТЕРФЕЙСА (РЕНДЕР) ---
+    // --- UI RENDER FUNCTIONS ---
     function renderMenu() {
       const app = document.getElementById('app');
       app.innerHTML = `
@@ -423,7 +440,6 @@ function login() {
       const score = window.episodeCorrect;
       const total = episode.words.length + (episode.proverb ? 1 : 0);
       
-      // ВОТ ТУТ МЫ СОХРАНЯЕМ ПРОГРЕСС
       if (!completedEpisodes.includes(episode.id)) {
         completedEpisodes.push(episode.id);
         saveProgressToFirebase();
@@ -471,10 +487,7 @@ function login() {
       `;
     }
 
-    // Запускаем проверку при старте
-    // renderMenu вызовется автоматически через onAuthStateChanged
+    console.log('🎮 Игра загружена! Firebase инициализирован.');
   </script>
 </body>
 </html>
-
-
