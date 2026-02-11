@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ru" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Орфографический Квест: Печорин</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+  <style>
+    body { box-sizing: border-box; }
+    .font-display { font-family: 'Playfair Display', serif; }
+    .font-body { font-family: 'Montserrat', sans-serif; }
+    
+    @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(234, 179, 8, 0.3); } 50% { box-shadow: 0 0 40px rgba(234, 179, 8, 0.6); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .animate-float { animation: float 3s ease-in-out infinite; }
+    .animate-glow { animation: glow 2s ease-in-out infinite; }
+    .animate-slide-in { animation: slideIn 0.5s ease-out forwards; }
+    
+    .mountain-bg { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 30%, #0f3460 60%, #533483 100%); }
+    .duel-bg { background: linear-gradient(180deg, #2d1b0e 0%, #5c3d2e 30%, #8b6914 60%, #d4a574 100%); }
+    .city-bg { background: linear-gradient(180deg, #1a0a2e 0%, #2d1b69 30%, #5b2c6f 60%, #f39c12 100%); }
+    .word-chip { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+    .progress-bar { background: linear-gradient(90deg, #eab308, #f59e0b); }
+  </style>
+</head>
+<body class="h-full font-body text-white">
+  <div id="app" class="h-full w-full overflow-auto"></div>
+
+  <script>
+    // --- НАСТРОЙКА FIREBASE ---
+    // ЗАМЕНИ ЭТИ ДАННЫЕ на свои из консоли Firebase (Project Settings -> General -> Your Apps)
+    const firebaseConfig = {
+  apiKey: "AIzaSyAG5DU2VJR_8FjBUs6ZkHJ90FGmB05RP_Q",
+  authDomain: "pechorin-quest.firebaseapp.com",
+  databaseURL: "https://pechorin-quest-default-rtdb.firebaseio.com", // проверь эту строку!
+  projectId: "pechorin-quest",
+  storageBucket: "pechorin-quest.firebasestorage.app",
+  messagingSenderId: "234397373581",
+  appId: "1:234397373581:web:f1b9b72f55939ad85d7ec4",
+  measurementId: "G-TR56QES3EP"
+};
+
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // --- СОСТОЯНИЕ ИГРЫ ---
+    let currentUser = null;
+    let completedEpisodes = [];
+    let leaderBoardData = [];
+
+    const config = {
+      game_title: 'Орфографический Квест',
+      primary_action_color: '#eab308',
+      surface_color: '#2d2d44',
+      text_color: '#f5f5f5'
+    };
+
+    // Данные эпизодов (оставил как в оригинале)
+    const episodes = [
+      { id: 1, title: 'Трэш на Кавказе', location: 'Горное ущелье', bgClass: 'mountain-bg', icon: '🏔️', originalText: 'Ну и движ тут, просто трэш. Эти горцы — вообще топчик!', correctText: 'Ну и движение тут, просто ужас. Эти горцы — очень сильные!', words: [{ slang: 'движ', correct: 'движение', options: ['движение', 'движуха', 'двигатель'] }, { slang: 'трэш', correct: 'ужас', options: ['ужас', 'мусор', 'трещина'] }, { slang: 'топчик', correct: 'очень сильные', options: ['очень сильные', 'вершина', 'топор'] }] },
+      { id: 2, title: 'Изи дуэль', location: 'Поле для дуэли', bgClass: 'duel-bg', icon: '⚔️', originalText: 'Ну чё, дуэль будет изи, я же краш всех дам!', correctText: 'Ну что ж, дуэль будет лёгкой, я же любимец всех дам!', words: [{ slang: 'чё', correct: 'что ж', options: ['что ж', 'чего', 'чей'] }, { slang: 'изи', correct: 'лёгкой', options: ['лёгкой', 'легко', 'лёгкий'] }, { slang: 'краш', correct: 'любимец', options: ['любимец', 'крушение', 'красавец'] }] },
+      { id: 3, title: 'Флекс в Махачкале', location: 'Шумная улица города', bgClass: 'city-bg', icon: '🌆', originalText: 'Эти люди — полный флекс, живут как хайповые тиктокеры!', correctText: 'Эти люди — полное веселье, живут как модники!', words: [{ slang: 'флекс', correct: 'веселье', options: ['веселье', 'гибкость', 'флаг'] }, { slang: 'хайповые', correct: 'модные', options: ['модные', 'высокие', 'хитрые'] }, { slang: 'тиктокеры', correct: 'модники', options: ['модники', 'танцоры', 'блогеры'] }], proverb: { full: 'Слово не воробей — вылетит, не поймаешь', words: ['Слово', 'не', 'воробей', '—', 'вылетит,', 'не', 'поймаешь'], distractors: ['флекс', 'хайп', 'кринж', 'рофл'] } }
+    ];
+
+    // --- ЛОГИКА FIREBASE ---
+    auth.onAuthStateChanged(user => {
+      currentUser = user;
+      if (user) {
+        loadUserProgress(user.uid);
+      }
+      renderMenu();
+    });
+
+    function login() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch(err => console.error(err));
+    }
+
+    function logout() {
+      auth.signOut().then(() => { location.reload(); });
+    }
+
+    function saveProgressToFirebase() {
+      if (currentUser) {
+        db.ref('users/' + currentUser.uid).set({
+          username: currentUser.displayName,
+          photo: currentUser.photoURL,
+          completed: completedEpisodes,
+          score: completedEpisodes.length
+        });
+        // Обновляем таблицу лидеров
+        db.ref('leaderboard/' + currentUser.uid).set({
+          username: currentUser.displayName,
+          score: completedEpisodes.length,
+          photo: currentUser.photoURL
+        });
+      }
+    }
+
+    function loadUserProgress(uid) {
+      db.ref('users/' + uid).once('value').then(snapshot => {
+        const data = snapshot.val();
+        if (data && data.completed) {
+          completedEpisodes = data.completed;
+          renderMenu();
+        }
+      });
+    }
+
+    function loadLeaderboard() {
+      db.ref('leaderboard').orderByChild('score').limitToLast(10).once('value').then(snapshot => {
+        leaderBoardData = [];
+        snapshot.forEach(child => {
+          leaderBoardData.unshift(child.val());
+        });
+        renderLeaderboard();
+      });
+    }
+
+    // --- РЕНДЕР ЭКРАНОВ ---
+    function renderMenu() {
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <div class="h-full w-full flex flex-col items-center justify-center p-6 mountain-bg relative overflow-hidden">
+          <div class="relative z-10 text-center max-w-2xl mx-auto">
+            <h1 class="font-display text-5xl md:text-6xl font-bold mb-4 animate-slide-in" style="color: ${config.primary_action_color};">
+              ${config.game_title}
+            </h1>
+            
+            ${currentUser ? `
+              <div class="mb-8 p-4 rounded-2xl flex items-center gap-4 bg-white/10 backdrop-blur-md animate-slide-in">
+                <img src="${currentUser.photoURL}" class="w-12 h-12 rounded-full border-2 border-yellow-500">
+                <div class="text-left">
+                  <p class="text-sm opacity-70">Привет, ${currentUser.displayName}</p>
+                  <p class="font-bold text-yellow-500">Пройдено: ${completedEpisodes.length}/3</p>
+                </div>
+                <button onclick="logout()" class="ml-auto text-xs opacity-50 hover:opacity-100 underline">Выйти</button>
+              </div>
+            ` : `
+              <button onclick="login()" class="mb-8 px-6 py-2 rounded-full bg-white text-black font-bold hover:scale-105 transition-all">
+                Войти через Google для сохранения очков
+              </button>
+            `}
+
+            <div class="flex flex-col gap-4">
+              <button onclick="startGame()" class="px-10 py-4 text-xl font-bold rounded-full bg-yellow-500 text-slate-900 animate-glow transition-all hover:scale-105">
+                Начать квест
+              </button>
+              <button onclick="loadLeaderboard()" class="px-10 py-3 text-lg font-semibold rounded-full bg-slate-700 text-white transition-all hover:bg-slate-600">
+                🏆 Таблица лидеров
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLeaderboard() {
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <div class="h-full w-full p-6 mountain-bg flex flex-col items-center">
+          <div class="max-w-md w-full animate-slide-in">
+            <div class="flex items-center justify-between mb-8">
+              <button onclick="renderMenu()" class="text-yellow-500">← Меню</button>
+              <h2 class="text-2xl font-bold text-yellow-500 font-display">Лучшие игроки</h2>
+              <div></div>
+            </div>
+            <div class="bg-slate-800/80 rounded-3xl overflow-hidden backdrop-blur-lg">
+              ${leaderBoardData.map((player, i) => `
+                <div class="flex items-center gap-4 p-4 border-b border-white/5 ${i === 0 ? 'bg-yellow-500/10' : ''}">
+                  <span class="text-xl font-bold w-6">${i + 1}</span>
+                  <img src="${player.photo}" class="w-10 h-10 rounded-full">
+                  <span class="flex-1 font-medium">${player.username}</span>
+                  <span class="text-yellow-500 font-bold">${player.score} 🏆</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // (Функции startGame, renderEpisodeSelect и другие остаются как в твоем исходном коде)
+    // ВАЖНО: В функции completeEpisode(episodeId) добавь вызов сохранения:
+    
+    function completeEpisode(episodeId) {
+      if (!completedEpisodes.includes(episodeId)) {
+        completedEpisodes.push(episodeId);
+        saveProgressToFirebase(); // <--- Добавили сохранение в Firebase
+      }
+      renderEpisodeSelect();
+    }
+    
+    // Дублируем основные функции навигации для работы
+    function startGame() { renderEpisodeSelect(); }
+    function renderEpisodeSelect() {
+        const app = document.getElementById('app');
+        // Тот же код, что и в твоем примере...
+        app.innerHTML = `<div class="p-10">Экраны эпизодов (используй свой старый код здесь)... <br><button onclick="renderMenu()" class="text-yellow-500 underline">В меню</button></div>`;
+    }
+
+    renderMenu();
+  </script>
+</body>
+</html>
