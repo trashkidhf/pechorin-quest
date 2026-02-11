@@ -42,16 +42,17 @@
 
   <script>
     // --- ТВОИ НАСТРОЙКИ FIREBASE ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyAG5DU2VJR_8FjBUs6ZkhJ90FGmB05RP_Q",
-      authDomain: "pechorin-quest.firebaseapp.com",
-      databaseURL: "https://pechorin-quest-default-rtdb.firebaseio.com",
-      projectId: "pechorin-quest",
-      storageBucket: "pechorin-quest.firebasestorage.app",
-      messagingSenderId: "234397373581",
-      appId: "1:234397373581:web:f1b9b72f55939ad85d7ec4",
-      measurementId: "G-TR56QES3EP"
-    };
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAG5DU2VJR_8FjBUs6ZkHJ90FGmB05RP_Q",
+  authDomain: "pechorin-quest.firebaseapp.com",
+  databaseURL: "https://pechorin-quest-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pechorin-quest",
+  storageBucket: "pechorin-quest.firebasestorage.app",
+  messagingSenderId: "234397373581",
+  appId: "1:234397373581:web:f1b9b72f55939ad85d7ec4",
+  measurementId: "G-TR56QES3EP"
+};
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -452,3 +453,4 @@
   </script>
 </body>
 </html>
+
